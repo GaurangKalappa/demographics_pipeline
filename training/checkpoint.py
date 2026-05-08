@@ -118,8 +118,8 @@ def save_best(
 ) -> None:
     """
     Save:
-      1. Full training state → checkpoint_best.pt  (resumable)
-      2. Model weights only  → {out_path}          (plug-in ready)
+    1. Full training state → checkpoint_best.pt  (resumable)
+    2. Model weights only  → {out_path}          (plug-in ready)
 
     Two separate atomic writes so both are always consistent.
     """
@@ -203,7 +203,7 @@ def setup_signal_handler() -> None:
         global _interrupt_requested
         sig_name = "SIGINT" if sig == signal.SIGINT else "SIGTERM"
         print(f"\n[Signal] {sig_name} received – "
-              "finishing current epoch then saving checkpoint …")
+            "finishing current epoch then saving checkpoint …")
         _interrupt_requested = True
 
     signal.signal(signal.SIGINT,  _handler)
