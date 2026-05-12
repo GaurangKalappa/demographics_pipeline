@@ -65,11 +65,19 @@ def prepare_body_crop(bgr_crop: np.ndarray) -> np.ndarray:
     -------
     np.ndarray  shape (3, H, W), dtype float32, C-contiguous
     """
-    crop = apply_clahe(bgr_crop)
+    #crop = apply_clahe(bgr_crop)
+    crop = bgr_crop.copy()
     crop = cv2.resize(crop, PAR_INPUT_SIZE)                      # (H, W, 3) BGR uint8
     crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)                 # (H, W, 3) RGB uint8
-    crop = crop.astype(np.float32) / 255.0                       # (H, W, 3) float32
-    crop = crop.transpose(2, 0, 1)                               # (3, H, W)
+    #crop = crop.astype(np.float32) / 255.0 
+    #crop = crop.transpose(2, 0, 1)
+    mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+    std  = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+
+    crop = crop.astype(np.float32) / 255.0
+    crop = (crop - mean) / std
+    crop = crop.transpose(2, 0, 1)
+    
     return np.ascontiguousarray(crop)                            # guarantee contiguous
 
 
@@ -94,7 +102,8 @@ def prepare_face_crop(bgr_crop: np.ndarray) -> np.ndarray:
     mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
     std  = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
-    crop = apply_clahe(bgr_crop)
+    #crop = apply_clahe(bgr_crop)
+    crop = bgr_crop.copy()
     crop = cv2.resize(crop, MTL_INPUT_SIZE)                      # (H, W, 3) BGR uint8
     crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)                 # (H, W, 3) RGB uint8
     crop = crop.astype(np.float32) / 255.0                       # (H, W, 3) float32

@@ -131,9 +131,9 @@ class PA100KDataset(Dataset):
                 if less18:
                     age_idx = 0          # Child
                 elif over60:
-                    age_idx = 3          # Senior
+                    age_idx = 2          # Senior
                 elif age1860:
-                    age_idx = 2          # Adult (18-60 not split further)
+                    age_idx = 1          # Adult (18-60 not split further)
                 else:
                     age_idx = 1          # Young Adult — noisy-label fallback
 
@@ -177,8 +177,12 @@ class PA100KDataset(Dataset):
         if self.augment:
             img = self._augment(img)
 
+        #img = img.astype(np.float32) / 255.0
+        #img = np.ascontiguousarray(img.transpose(2, 0, 1))  # CHW float32
+
         img = img.astype(np.float32) / 255.0
-        img = np.ascontiguousarray(img.transpose(2, 0, 1))  # CHW float32
+        img = (img - self.MEAN) / self.STD
+        img = np.ascontiguousarray(img.transpose(2, 0, 1))
 
         return {
             "image":      torch.from_numpy(img),
@@ -206,8 +210,7 @@ class PA100KDataset(Dataset):
         if random.random() < 0.3:
             h, w = img.shape[:2]
             pad  = 10
-            img  = cv2.copyMakeBorder(img, pad, pad, pad, pad,
-                                      cv2.BORDER_REFLECT)
+            img  = cv2.copyMakeBorder(img, pad, pad, pad, pad, cv2.BORDER_REFLECT)   
             x = random.randint(0, 2 * pad)
             y = random.randint(0, 2 * pad)
             img = img[y:y + h, x:x + w]

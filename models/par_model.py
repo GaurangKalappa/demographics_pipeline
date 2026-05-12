@@ -29,11 +29,12 @@ class PARModel(nn.Module):
     Use predict() for processed inference outputs.
     """
 
-    AGE_LABELS    = ["Child", "Young Adult", "Adult", "Senior"]
+    AGE_LABELS    = ["Child", "Adult", "Senior"]
     ORIENT_LABELS = ["Front", "Side", "Back"]
 
     # MobileNetV3-Large pooled feature dimension (fixed by architecture)
-    _FEATURE_DIM = 960
+    #_FEATURE_DIM=960
+    _FEATURE_DIM = 1280
 
     def __init__(self, weights_path: str | None = None, device: str = "cpu"):
         super().__init__()
@@ -44,9 +45,12 @@ class PARModel(nn.Module):
         # average pool.  The original classifier is NOT used – this avoids
         # relying on classifier[0].in_features which can break if torchvision
         # changes the head layout in a future release.
-        _full = tv_models.mobilenet_v3_large(weights=None)
-        self.features = _full.features            # Conv feature extractor
-        self.pool     = _full.avgpool             # AdaptiveAvgPool2d(1,1)
+        #_full = tv_models.mobilenet_v3_large(weights=None)
+        _full = tv_models.efficientnet_b0(weights=tv_models.EfficientNet_B0_Weights.IMAGENET1K_V1)
+        #self.features = _full.features            # Conv feature extractor
+        #self.pool     = _full.avgpool             # AdaptiveAvgPool2d(1,1)
+        self.features = _full.features
+        self.pool     = nn.AdaptiveAvgPool2d(1)
         del _full                                 # free the unused classifier
 
         feature_dim = self._FEATURE_DIM
@@ -102,7 +106,7 @@ class PARModel(nn.Module):
         feats = feats.flatten(1)                  # (B, 960)
         return {
             "gender": self.gender_head(feats),    # (B, 1)  raw logit
-            "age":    self.age_head(feats),        # (B, 4)  raw logits
+            "age":    self.age_head(feats),        # (B, 3)  raw logits
             "orient": self.orient_head(feats),     # (B, 3)  raw logits
         }
 

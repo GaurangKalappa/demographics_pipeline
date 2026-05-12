@@ -45,6 +45,48 @@ from training.checkpoint import (
     TrainingLogger, setup_signal_handler, interrupt_requested,
 )
 
+def compute_age_class_weights(dataset, device):
+    """
+    Compute inverse-frequency class weights for PAR age classes.
+    """
+
+    counts = torch.zeros(3, dtype=torch.float32)
+
+    for _, _, age_idx, _ in dataset.samples:
+        counts[age_idx] += 1
+
+    total = counts.sum()
+
+    # Smoothed Inverse frequency
+    weights = torch.sqrt(total / counts)
+
+    # Normalize so mean weight ≈ 1
+    weights = weights / weights.mean()
+
+    return weights.to(device)
+
+'''
+def compute_gender_pos_weight(dataset, device):
+    """
+    Compute BCE positive-class weight for gender classification.
+    Positive class = Female (1)
+    """
+
+    female_count = 0
+    male_count = 0
+
+    for _, gender, _, _ in dataset.samples:
+        if gender == 1.0:
+            female_count += 1
+        else:
+            male_count += 1
+
+    # BCEWithLogitsLoss pos_weight:
+    # weight positive class relative to negative
+    pos_weight = male_count / max(female_count, 1)
+
+    return torch.tensor([pos_weight], dtype=torch.float32).to(device)
+'''
 
 # ── Loss helpers ──────────────────────────────────────────────────────────────
 
@@ -53,8 +95,8 @@ def gender_loss(logit: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         logit.squeeze(1), target)
 
 
-def age_loss(logit: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-    return nn.functional.cross_entropy(logit, target)
+def age_loss(logit: torch.Tensor, target: torch.Tensor, weights) -> torch.Tensor:
+    return nn.functional.cross_entropy(logit, target, weight=weights)
 
 
 def orient_loss(logit: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
@@ -82,7 +124,7 @@ def build_phase2_optimiser(model: PARModel, lr: float):
 
 # ── Train / eval loops ────────────────────────────────────────────────────────
 
-def train_one_epoch(model, loader, optimiser, device, gw, aw, ow):
+def train_one_epoch(model, loader, optimiser, device, gw, aw, ow, age_class_weights):
     model.train()
     t_loss = t_g = t_a = 0.0
 
@@ -96,8 +138,8 @@ def train_one_epoch(model, loader, optimiser, device, gw, aw, ow):
         out = model(imgs)
 
         lg = gender_loss(out["gender"], genders)
-        la = age_loss(out["age"], age_idx)
-        lo = orient_loss(out["orient"], ori_idx) if ow > 0 else torch.tensor(0.0)
+        la = age_loss(out["age"], age_idx, age_class_weights)
+        lo = orient_loss(out["orient"], ori_idx) if ow > 0 else torch.tensor(0.0, device=device)
 
         loss = gw * lg + aw * la + ow * lo
         loss.backward()
@@ -113,7 +155,7 @@ def train_one_epoch(model, loader, optimiser, device, gw, aw, ow):
 
 
 @torch.no_grad()
-def evaluate(model, loader, device, gw, aw, ow):
+def evaluate(model, loader, device, gw, aw, ow, age_class_weights):
     model.eval()
     t_loss = 0.0
     g_correct = a_correct = total = 0
@@ -126,8 +168,8 @@ def evaluate(model, loader, device, gw, aw, ow):
 
         out = model(imgs)
         lg = gender_loss(out["gender"], genders)
-        la = age_loss(out["age"], age_idx)
-        lo = orient_loss(out["orient"], ori_idx) if ow > 0 else torch.tensor(0.0)
+        la = age_loss(out["age"], age_idx, age_class_weights)
+        lo = orient_loss(out["orient"], ori_idx) if ow > 0 else torch.tensor(0.0, device=device)
 
         t_loss += (gw * lg + aw * la + ow * lo).item()
 
@@ -181,6 +223,10 @@ def main():
 
     # ── Datasets ──────────────────────────────────────────────────────────────
     train_ds = PA100KDataset(args.data, split="train", augment=True)
+    
+    age_class_weights = compute_age_class_weights(train_ds, device)       #dynamic weights
+    print(f"[Age Weights] {age_class_weights.cpu().numpy()}")
+
     val_ds   = PA100KDataset(args.data, split="val",   augment=False)
     train_ld = DataLoader(train_ds, batch_size=args.batch, shuffle=True,
                           num_workers=args.workers, pin_memory=True)
@@ -195,7 +241,7 @@ def main():
     best_val       = float("inf")
     patience_count = 0
     history: list[dict] = []
-    unfreeze_epoch = args.epochs // 2
+    unfreeze_epoch = 4
 
     # ── Phase 1 setup ─────────────────────────────────────────────────────────
     for p in model.features.parameters():
@@ -261,10 +307,10 @@ def main():
 
         tl, tg, ta = train_one_epoch(
             model, train_ld, optimiser, device,
-            args.gender_w, args.age_w, args.orient_w)
+            args.gender_w, args.age_w, args.orient_w, age_class_weights)
         vl, g_acc, a_acc = evaluate(
             model, val_ld, device,
-            args.gender_w, args.age_w, args.orient_w)
+            args.gender_w, args.age_w, args.orient_w, age_class_weights)
         scheduler.step()
 
         improved = vl < best_val

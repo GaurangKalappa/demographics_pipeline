@@ -1,0 +1,6 @@
+demopenv/
+__pycache__/
+*.pyc
+logs/
+weights/*.onnx
+weights/*.onnx.data

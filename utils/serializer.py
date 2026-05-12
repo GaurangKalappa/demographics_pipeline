@@ -46,5 +46,11 @@ def print_record(record: dict, result: Optional[DecisionResult] = None):
         print(f"  ── debug ──────────────────────────────────────")
         print(f"     Source     : {result.source}")
         print(f"     P(Female)  : {result.gender_score:.3f}")
-        print(f"     Age (raw)  : {result.age_raw:.1f}")
+        age_raw_str = (
+        f"{result.age_raw:.1f}"
+        if result.age_raw is not None
+        else "N/A"
+        )
+
+        print(f"     Age (raw)  : {age_raw_str}")
     print(f"{sep}\n")

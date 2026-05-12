@@ -84,6 +84,8 @@ def save_checkpoint(
     Uses atomic_save so a crash during write cannot corrupt the file.
     """
     payload = {
+        "model_name": model.__class__.__name__,
+        "num_age_classes": len(model.AGE_LABELS),
         "epoch":          epoch,
         "model_state":    model.state_dict(),
         "optim_state":    optimiser.state_dict(),

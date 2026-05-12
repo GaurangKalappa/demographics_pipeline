@@ -38,7 +38,7 @@ class DecisionResult:
     __slots__ = ("gender", "gender_score", "age_raw", "age_range", "source")
 
     def __init__(self, gender: str, gender_score: float,
-                 age_raw: float, age_range: str, source: str):
+                 age_raw: float | None, age_range: str, source: str):
         self.gender       = gender        # "Male" | "Female"
         self.gender_score = gender_score  # probability of Female [0,1]
         self.age_raw      = age_raw
@@ -117,7 +117,7 @@ def _body_result(gender_body_score: float, age_coarse: str) -> DecisionResult:
     return DecisionResult(
         gender       = _score_to_gender(gender_body_score),
         gender_score = gender_body_score,
-        age_raw      = float(age_mid),
+        age_raw      = None,
         age_range    = age_coarse,
         source       = "body",
     )
@@ -127,10 +127,10 @@ def _coarse_age_to_midpoint(label: str) -> float:
     """Map PAR coarse age label → numeric midpoint for blending."""
     mapping = {
         "Child":       6.0,
-        "Teen":       15.5,
-        "Young Adult": 24.5,
+        #"Teen":       15.5,
+        #"Young Adult": 24.5,
         "Adult":       38.0,
-        "Middle-Aged": 53.0,
+        #"Middle-Aged": 53.0,
         "Senior":      70.0,
     }
     return mapping.get(label, 38.0)   # default to Adult midpoint
